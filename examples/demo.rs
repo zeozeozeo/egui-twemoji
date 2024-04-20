@@ -28,10 +28,14 @@ impl eframe::App for ExampleApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 EmojiLabel::new("⭐ egui-twemoji 🐦 demo ✨").show(ui);
-                EmojiLabel::new(
+                if EmojiLabel::new(
                     RichText::new("👉 This 👈 is a strong 💪😈 RichText 🤑💰 label").strong(),
                 )
-                .show(ui);
+                .show(ui)
+                .hovered()
+                {
+                    EmojiLabel::new("hovered! 😸").show(ui);
+                }
                 EmojiLabel::new("Yes 👍, you 🤟 can 🎥 select 📝 and copy 🍝 this 👌").show(ui);
 
                 ui.separator();

@@ -10,12 +10,21 @@ enum TextSegment {
     Emoji(String),
 }
 
+#[inline]
+fn is_emoji(text: &str) -> bool {
+    #[cfg(feature = "svg")]
+    return twemoji_assets::svg::SvgTwemojiAsset::from_emoji(text).is_some();
+
+    #[cfg(feature = "png")]
+    return twemoji_assets::png::PngTwemojiAsset::from_emoji(text).is_some();
+}
+
 fn segment_text(input: &RichText) -> Vec<TextSegment> {
     let mut result = Vec::new();
     let mut text = String::new();
 
     for grapheme in UnicodeSegmentation::graphemes(input.text(), true) {
-        if emojis::get(grapheme).is_some() {
+        if is_emoji(grapheme) {
             if !text.is_empty() {
                 result.push(TextSegment::Text(
                     ExposedRichText::new_keep_properties(text.clone(), input).into(),
@@ -98,6 +107,52 @@ fn get_source_for_emoji(emoji: &str) -> Option<ImageSource> {
     }
 }
 
+#[inline]
+fn empty_response(ctx: egui::Context) -> egui::Response {
+    egui::Response {
+        ctx,
+        layer_id: egui::LayerId::background(),
+        id: egui::Id::NULL,
+        rect: egui::Rect::ZERO,
+        interact_rect: egui::Rect::ZERO,
+        sense: Sense::click(),
+        enabled: false,
+        contains_pointer: false,
+        hovered: false,
+        highlighted: false,
+        clicked: false,
+        fake_primary_click: false,
+        long_touched: false,
+        drag_started: false,
+        dragged: false,
+        drag_stopped: false,
+        is_pointer_button_down_on: false,
+        interact_pointer_pos: None,
+        changed: false,
+    }
+}
+
+fn apply_response_diff(resp: &egui::Response, out: &mut egui::Response) {
+    out.layer_id = resp.layer_id;
+    out.id = resp.id;
+    out.rect = out.rect.union(resp.rect);
+    out.interact_rect = out.interact_rect.union(resp.interact_rect);
+    out.sense |= resp.sense;
+    out.enabled |= resp.enabled;
+    out.contains_pointer |= resp.contains_pointer;
+    out.hovered |= resp.hovered;
+    out.highlighted |= resp.highlighted;
+    out.clicked |= resp.clicked;
+    out.fake_primary_click |= resp.fake_primary_click;
+    out.long_touched |= resp.long_touched;
+    out.drag_started |= resp.drag_started;
+    out.dragged |= resp.dragged;
+    out.drag_stopped |= resp.drag_stopped;
+    out.is_pointer_button_down_on |= resp.is_pointer_button_down_on;
+    out.interact_pointer_pos = resp.interact_pointer_pos;
+    out.changed |= resp.changed;
+}
+
 impl EmojiLabel {
     pub fn new(text: impl Into<RichText>) -> Self {
         Self {
@@ -167,7 +222,7 @@ impl EmojiLabel {
         self
     }
 
-    pub fn show(self, ui: &mut egui::Ui) {
+    pub fn show(self, ui: &mut egui::Ui) -> egui::Response {
         let id = egui::Id::new(self.text());
         let mut state = LabelState::load(ui.ctx(), id, &self.text);
 
@@ -177,13 +232,24 @@ impl EmojiLabel {
         }
 
         let font_height = ui.text_style_height(&egui::TextStyle::Body);
+        let mut resp = empty_response(ui.ctx().clone());
 
         ui.horizontal_wrapped(|ui| {
             for segment in &state.segments {
                 ui.spacing_mut().item_spacing.x = 0.0;
                 match segment {
                     TextSegment::Text(text) => {
-                        ui.label(text.clone());
+                        let mut label = egui::Label::new(text.clone()).truncate(self.truncate);
+                        if let Some(wrap) = self.wrap {
+                            label = label.wrap(wrap);
+                        }
+                        if let Some(selectable) = self.selectable {
+                            label = label.selectable(selectable);
+                        }
+                        if let Some(sense) = self.sense {
+                            label = label.sense(sense);
+                        }
+                        apply_response_diff(&ui.add(label), &mut resp);
                     }
                     TextSegment::Emoji(emoji) => {
                         let Some(source) = get_source_for_emoji(emoji) else {
@@ -191,22 +257,27 @@ impl EmojiLabel {
                         };
 
                         ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
-                            let rect = ui
+                            let image_rect = ui
                                 .add(egui::Image::new(source).max_height(font_height))
                                 .rect;
 
                             // for emoji selection and copying:
-                            ui.put(
-                                rect,
-                                egui::Label::new(
-                                    RichText::new(emoji).color(egui::Color32::TRANSPARENT),
+                            apply_response_diff(
+                                &ui.put(
+                                    image_rect,
+                                    egui::Label::new(
+                                        RichText::new(emoji).color(egui::Color32::TRANSPARENT),
+                                    ),
                                 ),
+                                &mut resp,
                             );
                         });
                     }
                 }
             }
         });
+
+        resp
     }
 }
 
