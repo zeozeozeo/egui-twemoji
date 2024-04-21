@@ -73,7 +73,7 @@ impl LabelState {
     }
 }
 
-#[must_use = "You should put this widget in an ui with `ui.add(widget);`"]
+#[must_use = "You should put this widget in an ui by calling `.show(ui);`"]
 pub struct EmojiLabel {
     text: RichText,
     wrap: Option<bool>,
