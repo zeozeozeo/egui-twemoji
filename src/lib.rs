@@ -258,7 +258,10 @@ impl EmojiLabel {
 
                         ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
                             let image_rect = ui
-                                .add(egui::Image::new(source).max_height(font_height))
+                                .add(
+                                    egui::Image::new(source)
+                                        .fit_to_exact_size(egui::vec2(font_height, font_height)),
+                                )
                                 .rect;
 
                             // for emoji selection and copying:
