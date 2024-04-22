@@ -45,6 +45,12 @@ impl eframe::App for ExampleApp {
                 ui.collapsing("Emoji Madness (laggy)", |ui| {
                     emoji_madness(ui);
                 });
+
+                ui.horizontal_wrapped(|ui| {
+                    EmojiLabel::new("a a a a a a a a a a 👍 a a a a a a a a a a a a ").show(ui);
+                    EmojiLabel::new("b b b b b b b 👍 b b b b b b 👍 b b b b 👍 b b b 👍 b b ")
+                        .show(ui);
+                });
             });
         });
     }
