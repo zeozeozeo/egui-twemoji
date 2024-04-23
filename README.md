@@ -1,5 +1,7 @@
 # egui-twemoji
 
+![docs.rs](https://img.shields.io/docsrs/egui-twemoji) ![Downloads on Crates.io](https://img.shields.io/crates/d/egui-twemoji)
+
 An [egui](https://egui.rs/) widget that renders colored [Twemojis](https://github.com/twitter/twemoji). Based on [twemoji-assets](https://github.com/cptpiepmatz/twemoji-assets).
 
 ![demo](/media/demo.png)
