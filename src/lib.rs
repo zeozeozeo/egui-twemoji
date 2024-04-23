@@ -1,11 +1,60 @@
+//! # egui-twemoji
+//!
+//! An [egui](https://egui.rs/) widget that renders colored [Twemojis](https://github.com/twitter/twemoji).
+//! Based on [twemoji-assets](https://github.com/cptpiepmatz/twemoji-assets).
+//!
+//! ![demo](https://github.com/zeozeozeo/egui-twemoji/blob/master/media/demo.png?raw=true)
+//!
+//! # How to use
+//!
+//! Make sure you've installed `egui_extras` image loaders (required for rendering SVG and PNG emotes):
+//!
+//! ```ignore
+//! // don't do this every frame - only when the app is created!
+//! egui_extras::install_image_loaders(&cc.egui_ctx);
+//! ```
+//!
+//! And then:
+//!
+//! ```rust
+//! use egui_twemoji::EmojiLabel;
+//!
+//! fn show_label(ui: &mut egui::Ui) {
+//!     EmojiLabel::new("⭐ egui-twemoji 🐦✨").show(ui);
+//! }
+//! ```
+//!
+//! For a more sophisticated example, see the `demo` example (`cargo run --example demo`)
+//!
+//! `EmojiLabel` supports all functions that a normal
+//! [Label](https://docs.rs/egui/latest/egui/widgets/struct.Label.html) does.
+//!
+//! # Features
+//!
+//! * `svg`: use SVG emoji assets (`egui_extras/svg` is required)
+//! * `png`: use PNG emoji assets (`egui_extras/image` is required)
+//!
+//! By default, the `svg` feature is activated.
+//!
+//! # License
+//!
+//! Unlicense OR MIT OR Apache-2.0
+
+#![warn(missing_docs)]
+
 mod exposed;
 
-use std::sync::Arc;
-
-use egui::{text::LayoutJob, ImageSource, Layout, RichText, Sense};
+use egui::{ImageSource, Layout, RichText, Sense};
 use exposed::ExposedRichText;
 use unicode_segmentation::UnicodeSegmentation;
 
+#[cfg(all(feature = "svg", feature = "png"))]
+compile_error!("features 'svg' and 'png' are mutually exclusive and cannot be enabled together");
+
+/// Represents a segment of text which can be either plain text or an emoji.
+///
+/// * `Text` variant wraps the `RichText` struct, which includes text and its styling information.
+/// * `Emoji` variant contains a `String` representing the emoji character.
 #[derive(PartialEq, Clone)]
 enum TextSegment {
     Text(RichText),
@@ -21,6 +70,11 @@ fn is_emoji(text: &str) -> bool {
     return twemoji_assets::png::PngTwemojiAsset::from_emoji(text).is_some();
 }
 
+/// Returns a vector of [`TextSegment`]s from a [`RichText`], segmented by emojis.
+///
+/// ## Example:
+///
+/// "hello 😤 world" -> `[TextSegment::Text("hello "), TextSegment::Emoji("😤"), TextSegment::Text(" world")]`
 fn segment_text(input: &RichText) -> Vec<TextSegment> {
     let mut result = Vec::new();
     let mut text = String::new();
@@ -48,6 +102,8 @@ fn segment_text(input: &RichText) -> Vec<TextSegment> {
     result
 }
 
+/// The state of an [EmojiLabel], stored in egui's [`egui::Memory`].
+/// This includes memoized text segments and whether the state was newly created.
 #[derive(Default, Clone)]
 struct LabelState {
     segments: Vec<TextSegment>,
@@ -55,6 +111,7 @@ struct LabelState {
 }
 
 impl LabelState {
+    /// Create a new state from a [`RichText`], segmenting it by emojis.
     fn from_text(text: impl Into<RichText>) -> Self {
         let rich_text = text.into();
         Self {
@@ -63,6 +120,7 @@ impl LabelState {
         }
     }
 
+    /// Load the state from egui's [`egui::Memory`].
     fn load(ctx: &egui::Context, id: egui::Id, text: &RichText) -> Self {
         ctx.data_mut(|d| {
             d.get_temp(id)
@@ -70,22 +128,64 @@ impl LabelState {
         })
     }
 
+    /// Save the state to egui's [`egui::Memory`]. Only call this if [`Self::is_saved`] is `false`.
     fn save(self, ctx: &egui::Context, id: egui::Id) {
         ctx.data_mut(|d| d.insert_temp(id, self));
     }
 }
 
+/// An [egui](https://egui.rs/) widget that renders colored [Twemojis](https://github.com/twitter/twemoji).
+///
+/// ```rust
+/// use egui_twemoji::EmojiLabel;
+///
+/// fn show_label(ui: &mut egui::Ui) {
+///     EmojiLabel::new("⭐ egui-twemoji 🐦✨").show(ui);
+/// }
+/// ```
 #[must_use = "You should put this widget in an ui by calling `.show(ui);`"]
 pub struct EmojiLabel {
-    text: RichText,
-    wrap: Option<bool>,
-    truncate: bool,
-    sense: Option<Sense>,
-    selectable: Option<bool>,
+    /// The text to render.
+    pub text: RichText,
+    /// If `true`, the text will wrap to stay within the max width of the [`Ui`].
+    ///
+    /// Calling `wrap` will override [`Self::truncate`].
+    ///
+    /// By default [`Self::wrap`] will be `true` in vertical layouts
+    /// and horizontal layouts with wrapping,
+    /// and `false` on non-wrapping horizontal layouts.
+    ///
+    /// Note that any `\n` in the text will always produce a new line.
+    ///
+    /// You can also use [`egui::Style::wrap`].
+    pub wrap: Option<bool>,
+    /// If `true`, the text will stop at the max width of the [`Ui`],
+    /// and what doesn't fit will be elided, replaced with `…`.
+    ///
+    /// If the text is truncated, the full text will be shown on hover as a tool-tip.
+    ///
+    /// Default is `false`, which means the text will expand the parent [`Ui`],
+    /// or wrap if [`Self::wrap`] is set.
+    ///
+    /// Calling `truncate` will override [`Self::wrap`].
+    pub truncate: bool,
+    /// Make the label respond to clicks and/or drags.
+    ///
+    /// By default, a label is inert and does not respond to click or drags.
+    /// By calling this you can turn the label into a button of sorts.
+    /// This will also give the label the hover-effect of a button, but without the frame.
+    pub sense: Option<Sense>,
+    /// Can the user select the text with the mouse?
+    ///
+    /// Overrides [`egui::style::Interaction::selectable_labels`].
+    pub selectable: Option<bool>,
+    /// Whether the widget should recognize that it is in a horizontal layout and not create a new one.
+    /// This fixes some wrapping issues with [`egui::Label`].
+    ///
+    /// In vertical layouts, the widget will create a new horizontal layout so text segments stay on the
+    /// same line.
+    pub auto_inline: bool,
 }
-
-#[cfg(all(feature = "svg", feature = "png"))]
-compile_error!("features 'svg' and 'png' are mutually exclusive and cannot be enabled together");
 
 fn get_source_for_emoji(emoji: &str) -> Option<ImageSource> {
     #[cfg(feature = "svg")]
@@ -135,6 +235,7 @@ fn empty_response(ctx: egui::Context) -> egui::Response {
 }
 
 impl EmojiLabel {
+    /// Create a new [`EmojiLabel`] from a [`RichText`].
     pub fn new(text: impl Into<RichText>) -> Self {
         Self {
             text: text.into(),
@@ -142,11 +243,18 @@ impl EmojiLabel {
             truncate: false,
             sense: None,
             selectable: None,
+            auto_inline: true,
         }
     }
 
+    /// Get the text to render as a [str].
     pub fn text(&self) -> &str {
         self.text.text()
+    }
+
+    /// Get the text to render as a [`RichText`].
+    pub fn rich_text(&self) -> &RichText {
+        &self.text
     }
 
     /// If `true`, the text will wrap to stay within the max width of the [`Ui`].
@@ -203,239 +311,80 @@ impl EmojiLabel {
         self
     }
 
+    /// Whether the widget should recognize that it is in a horizontal layout and not create a new one.
+    /// This fixes some wrapping issues with [`egui::Label`].
+    ///
+    /// In vertical layouts, the widget will create a new horizontal layout so text segments stay on the
+    /// same line.
+    #[inline]
+    pub fn auto_inline(mut self, auto_inline: bool) -> Self {
+        self.auto_inline = auto_inline;
+        self
+    }
+
+    fn show_segments(&self, ui: &mut egui::Ui, state: &mut LabelState) -> egui::Response {
+        let mut resp = empty_response(ui.ctx().clone());
+        let font_height = ui.text_style_height(&egui::TextStyle::Body);
+
+        for segment in &state.segments {
+            ui.spacing_mut().item_spacing.x = 0.0;
+            match segment {
+                TextSegment::Text(text) => {
+                    let mut label = egui::Label::new(text.clone()).truncate(self.truncate);
+                    if let Some(wrap) = self.wrap {
+                        label = label.wrap(wrap);
+                    }
+                    if let Some(selectable) = self.selectable {
+                        label = label.selectable(selectable);
+                    }
+                    if let Some(sense) = self.sense {
+                        label = label.sense(sense);
+                    }
+                    resp |= ui.add(label);
+                }
+                TextSegment::Emoji(emoji) => {
+                    let Some(source) = get_source_for_emoji(emoji) else {
+                        continue;
+                    };
+
+                    let image_rect = ui
+                        .add(
+                            egui::Image::new(source)
+                                .fit_to_exact_size(egui::vec2(font_height, font_height)),
+                        )
+                        .rect;
+
+                    // for emoji selection and copying:
+                    resp |= ui.put(
+                        image_rect,
+                        egui::Label::new(RichText::new(emoji).color(egui::Color32::TRANSPARENT)),
+                    );
+                }
+            }
+        }
+        resp
+    }
+
+    /// Add the label to an [`egui::Ui`].
     pub fn show(self, ui: &mut egui::Ui) -> egui::Response {
         let id = egui::Id::new(self.text());
         let mut state = LabelState::load(ui.ctx(), id, &self.text);
 
+        // if the state was newly created, write it back to memory:
         if !state.is_saved {
             state.is_saved = true;
             state.clone().save(ui.ctx(), id);
         }
 
-        let font_height = ui.text_style_height(&egui::TextStyle::Body);
-        let mut resp = empty_response(ui.ctx().clone());
-
-        ui.with_layout(
-            Layout::left_to_right(egui::Align::Min).with_main_wrap(true),
-            |ui| {
-                for segment in &state.segments {
-                    ui.spacing_mut().item_spacing.x = 0.0;
-                    match segment {
-                        TextSegment::Text(text) => {
-                            let mut label = egui::Label::new(text.clone()).truncate(self.truncate);
-                            if let Some(wrap) = self.wrap {
-                                label = label.wrap(wrap);
-                            }
-                            if let Some(selectable) = self.selectable {
-                                label = label.selectable(selectable);
-                            }
-                            if let Some(sense) = self.sense {
-                                label = label.sense(sense);
-                            }
-                            resp |= ui.add(label);
-                        }
-                        TextSegment::Emoji(emoji) => {
-                            let Some(source) = get_source_for_emoji(emoji) else {
-                                continue;
-                            };
-
-                            let image_rect = ui
-                                .add(
-                                    egui::Image::new(source)
-                                        .fit_to_exact_size(egui::vec2(font_height, font_height)),
-                                )
-                                .rect;
-
-                            // for emoji selection and copying:
-                            resp |= ui.put(
-                                image_rect,
-                                egui::Label::new(
-                                    RichText::new(emoji).color(egui::Color32::TRANSPARENT),
-                                ),
-                            );
-                        }
-                    }
-                }
-            },
-        );
-
-        resp
-    }
-}
-
-impl EmojiLabel {
-    pub fn layout_in_ui(
-        self,
-        ui: &mut egui::Ui,
-    ) -> (egui::Pos2, Arc<egui::Galley>, egui::Response) {
-        let selectable = self
-            .selectable
-            .unwrap_or_else(|| ui.style().interaction.selectable_labels);
-
-        let mut sense = self.sense.unwrap_or_else(|| {
-            if ui.memory(|mem| mem.options.screen_reader) {
-                // We only want to focus labels if the screen reader is on.
-                Sense::focusable_noninteractive()
-            } else {
-                Sense::hover()
-            }
-        });
-
-        if selectable {
-            // On touch screens (e.g. mobile in `eframe` web), should
-            // dragging select text, or scroll the enclosing [`ScrollArea`] (if any)?
-            // Since currently copying selected text in not supported on `eframe` web,
-            // we prioritize touch-scrolling:
-            let allow_drag_to_select = ui.input(|i| !i.has_touch_screen());
-
-            let mut select_sense = if allow_drag_to_select {
-                Sense::click_and_drag()
-            } else {
-                Sense::click()
-            };
-            select_sense.focusable = false; // Don't move focus to labels with TAB key.
-
-            sense = sense.union(select_sense);
-        }
-
-        let valign = ui.layout().vertical_align();
-        let mut layout_job = LayoutJob::default();
-
-        let id = egui::Id::new(self.text());
-        let mut state = LabelState::load(ui.ctx(), id, &self.text);
-
-        if !state.is_saved {
-            state.is_saved = true;
-            state.clone().save(ui.ctx(), id);
-        }
-
-        let font_height = ui.text_style_height(&egui::TextStyle::Body);
-
-        for segment in &state.segments {
-            match segment {
-                TextSegment::Text(text) => {
-                    text.clone().append_to(
-                        &mut layout_job,
-                        ui.style(),
-                        egui::FontSelection::Default,
-                        valign,
-                    );
-                }
-                TextSegment::Emoji(emoji) => {
-                    layout_job.append(emoji, -0.0, egui::TextFormat::default());
-                }
-            }
-        }
-        let truncate = self.truncate;
-        let wrap = !truncate && self.wrap.unwrap_or_else(|| ui.wrap_text());
-        let available_width = ui.available_width();
-
-        if wrap
-            && ui.layout().main_dir() == egui::Direction::LeftToRight
-            && ui.layout().main_wrap()
-            && available_width.is_finite()
-        {
-            // On a wrapping horizontal layout we want text to start after the previous widget,
-            // then continue on the line below! This will take some extra work:
-
-            let cursor = ui.cursor();
-            let first_row_indentation = available_width - ui.available_size_before_wrap().x;
-            egui::egui_assert!(first_row_indentation.is_finite());
-
-            layout_job.wrap.max_width = available_width;
-            layout_job.first_row_min_height = cursor.height();
-            layout_job.halign = egui::Align::Min;
-            layout_job.justify = false;
-            if let Some(first_section) = layout_job.sections.first_mut() {
-                first_section.leading_space = first_row_indentation;
-            }
-            let galley = ui.fonts(|fonts| fonts.layout_job(layout_job));
-
-            let pos = egui::pos2(ui.max_rect().left(), ui.cursor().top());
-            assert!(!galley.rows.is_empty(), "Galleys are never empty");
-            // collect a response from many rows:
-            let rect = galley.rows[0].rect.translate(egui::vec2(pos.x, pos.y));
-            let mut response = ui.allocate_rect(rect, sense);
-            for row in galley.rows.iter().skip(1) {
-                let rect = row.rect.translate(egui::vec2(pos.x, pos.y));
-                response |= ui.allocate_rect(rect, sense);
-            }
-            (pos, galley, response)
+        if ui.layout().is_horizontal() && self.auto_inline {
+            self.show_segments(ui, &mut state)
         } else {
-            if truncate {
-                layout_job.wrap.max_width = available_width;
-                layout_job.wrap.max_rows = 1;
-                layout_job.wrap.break_anywhere = true;
-            } else if wrap {
-                layout_job.wrap.max_width = available_width;
-            } else {
-                layout_job.wrap.max_width = f32::INFINITY;
-            };
-
-            // if ui.is_grid() {
-            //     layout_job.halign = Align::LEFT;
-            //     layout_job.justify = false;
-            // } else {
-            //     layout_job.halign = ui.layout().horizontal_placement();
-            //     layout_job.justify = ui.layout().horizontal_justify();
-            // };
-
-            let galley = ui.fonts(|fonts| fonts.layout_job(layout_job));
-            let (rect, response) = ui.allocate_exact_size(galley.size(), sense);
-            let galley_pos = match galley.job.halign {
-                egui::Align::LEFT => rect.left_top(),
-                egui::Align::Center => rect.center_top(),
-                egui::Align::RIGHT => rect.right_top(),
-            };
-            (galley_pos, galley, response)
+            ui.with_layout(
+                Layout::left_to_right(egui::Align::Min).with_main_wrap(true),
+                |ui| self.show_segments(ui, &mut state),
+            )
+            .inner
         }
-    }
-}
-
-impl egui::Widget for EmojiLabel {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        // Interactive = the uses asked to sense interaction.
-        // We DON'T want to have the color respond just because the text is selectable;
-        // the cursor is enough to communicate that.
-        let interactive = self.sense.map_or(false, |sense| sense != Sense::hover());
-
-        let selectable = self.selectable;
-
-        let (galley_pos, galley, mut response) = self.layout_in_ui(ui);
-        response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, galley.text()));
-
-        if ui.is_rect_visible(response.rect) {
-            if galley.elided {
-                // Show the full (non-elided) text on hover:
-                response = response.on_hover_text(galley.text());
-            }
-
-            let response_color = if interactive {
-                ui.style().interact(&response).text_color()
-            } else {
-                ui.style().visuals.text_color()
-            };
-
-            let underline = if response.has_focus() || response.highlighted() {
-                egui::Stroke::new(1.0, response_color)
-            } else {
-                egui::Stroke::NONE
-            };
-
-            ui.painter().add(
-                egui::epaint::TextShape::new(galley_pos, galley.clone(), response_color)
-                    .with_underline(underline),
-            );
-
-            let selectable = selectable.unwrap_or_else(|| ui.style().interaction.selectable_labels);
-            if selectable {
-                egui::text_selection::LabelSelectionState::label_text_selection(
-                    ui, &response, galley_pos, &galley,
-                );
-            }
-        }
-
-        response
     }
 }
 

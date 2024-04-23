@@ -1,6 +1,6 @@
 # egui-twemoji
 
-An [egui](https://egui.rs/) text widget with [Twemojis](https://github.com/twitter/twemoji). Based on [twemoji-assets](https://github.com/cptpiepmatz/twemoji-assets).
+An [egui](https://egui.rs/) widget that renders colored [Twemojis](https://github.com/twitter/twemoji). Based on [twemoji-assets](https://github.com/cptpiepmatz/twemoji-assets).
 
 ![demo](/media/demo.png)
 
@@ -16,6 +16,8 @@ egui_extras::install_image_loaders(&cc.egui_ctx);
 And then:
 
 ```rust
+use egui_twemoji::EmojiLabel;
+
 fn show_label(ui: &mut egui::Ui) {
     EmojiLabel::new("⭐ egui-twemoji 🐦✨").show(ui);
 }
