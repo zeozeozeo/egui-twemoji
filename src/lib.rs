@@ -330,9 +330,9 @@ impl EmojiLabel {
             ui.spacing_mut().item_spacing.x = 0.0;
             match segment {
                 TextSegment::Text(text) => {
-                    let mut label = egui::Label::new(text.clone()).truncate();
+                    let mut label = egui::Label::new(text.clone()).truncate(self.truncate);
                     if let Some(wrap) = self.wrap {
-                        label = label.wrap();
+                        label = label.wrap(wrap);
                     }
                     if let Some(selectable) = self.selectable {
                         label = label.selectable(selectable);
