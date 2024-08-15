@@ -13,7 +13,7 @@ fn main() -> Result<(), eframe::Error> {
             // this is important: we are going to be rendering the emojis as SVGs
             egui_extras::install_image_loaders(&cc.egui_ctx);
 
-            Box::<ExampleApp>::default()
+            Ok(Box::<ExampleApp>::default())
         }),
     )
 }
