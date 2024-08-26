@@ -44,7 +44,7 @@
 
 mod exposed;
 
-use egui::{ImageSource, Layout, RichText, Sense};
+use egui::{ImageSource, Layout, RichText, Sense, TextWrapMode};
 use exposed::ExposedRichText;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -145,46 +145,11 @@ impl LabelState {
 /// ```
 #[must_use = "You should put this widget in an ui by calling `.show(ui);`"]
 pub struct EmojiLabel {
-    /// The text to render.
-    pub text: RichText,
-    /// If `true`, the text will wrap to stay within the max width of the [`Ui`].
-    ///
-    /// Calling `wrap` will override [`Self::truncate`].
-    ///
-    /// By default [`Self::wrap`] will be `true` in vertical layouts
-    /// and horizontal layouts with wrapping,
-    /// and `false` on non-wrapping horizontal layouts.
-    ///
-    /// Note that any `\n` in the text will always produce a new line.
-    ///
-    /// You can also use [`egui::Style::wrap`].
-    pub wrap: Option<bool>,
-    /// If `true`, the text will stop at the max width of the [`Ui`],
-    /// and what doesn't fit will be elided, replaced with `…`.
-    ///
-    /// If the text is truncated, the full text will be shown on hover as a tool-tip.
-    ///
-    /// Default is `false`, which means the text will expand the parent [`Ui`],
-    /// or wrap if [`Self::wrap`] is set.
-    ///
-    /// Calling `truncate` will override [`Self::wrap`].
-    pub truncate: bool,
-    /// Make the label respond to clicks and/or drags.
-    ///
-    /// By default, a label is inert and does not respond to click or drags.
-    /// By calling this you can turn the label into a button of sorts.
-    /// This will also give the label the hover-effect of a button, but without the frame.
-    pub sense: Option<Sense>,
-    /// Can the user select the text with the mouse?
-    ///
-    /// Overrides [`egui::style::Interaction::selectable_labels`].
-    pub selectable: Option<bool>,
-    /// Whether the widget should recognize that it is in a horizontal layout and not create a new one.
-    /// This fixes some wrapping issues with [`egui::Label`].
-    ///
-    /// In vertical layouts, the widget will create a new horizontal layout so text segments stay on the
-    /// same line.
-    pub auto_inline: bool,
+    text: RichText,
+    wrap_mode: Option<TextWrapMode>,
+    sense: Option<Sense>,
+    selectable: Option<bool>,
+    auto_inline: bool,
 }
 
 fn get_source_for_emoji(emoji: &str) -> Option<ImageSource> {
@@ -239,8 +204,7 @@ impl EmojiLabel {
     pub fn new(text: impl Into<RichText>) -> Self {
         Self {
             text: text.into(),
-            wrap: None,
-            truncate: false,
+            wrap_mode: None,
             sense: None,
             selectable: None,
             auto_inline: true,
@@ -257,37 +221,36 @@ impl EmojiLabel {
         &self.text
     }
 
-    /// If `true`, the text will wrap to stay within the max width of the [`Ui`].
+    /// Set the wrap mode for the text.
     ///
-    /// Calling `wrap` will override [`Self::truncate`].
-    ///
-    /// By default [`Self::wrap`] will be `true` in vertical layouts
-    /// and horizontal layouts with wrapping,
-    /// and `false` on non-wrapping horizontal layouts.
+    /// By default, [`egui::Ui::wrap_mode`] will be used, which can be overridden with [`egui::Style::wrap_mode`].
     ///
     /// Note that any `\n` in the text will always produce a new line.
-    ///
-    /// You can also use [`egui::Style::wrap`].
     #[inline]
-    pub fn wrap(mut self, wrap: bool) -> Self {
-        self.wrap = Some(wrap);
-        self.truncate = false;
+    pub fn wrap_mode(mut self, wrap_mode: TextWrapMode) -> Self {
+        self.wrap_mode = Some(wrap_mode);
         self
     }
 
-    /// If `true`, the text will stop at the max width of the [`Ui`],
-    /// and what doesn't fit will be elided, replaced with `…`.
-    ///
-    /// If the text is truncated, the full text will be shown on hover as a tool-tip.
-    ///
-    /// Default is `false`, which means the text will expand the parent [`Ui`],
-    /// or wrap if [`Self::wrap`] is set.
-    ///
-    /// Calling `truncate` will override [`Self::wrap`].
+    /// Set [`Self::wrap_mode`] to [`TextWrapMode::Wrap`].
     #[inline]
-    pub fn truncate(mut self, truncate: bool) -> Self {
-        self.wrap = None;
-        self.truncate = truncate;
+    pub fn wrap(mut self) -> Self {
+        self.wrap_mode = Some(TextWrapMode::Wrap);
+        self
+    }
+
+    /// Set [`Self::wrap_mode`] to [`TextWrapMode::Truncate`].
+    #[inline]
+    pub fn truncate(mut self) -> Self {
+        self.wrap_mode = Some(TextWrapMode::Truncate);
+        self
+    }
+
+    /// Set [`Self::wrap_mode`] to [`TextWrapMode::Extend`],
+    /// disabling wrapping and truncating, and instead expanding the parent [`Ui`].
+    #[inline]
+    pub fn extend(mut self) -> Self {
+        self.wrap_mode = Some(TextWrapMode::Extend);
         self
     }
 
@@ -330,15 +293,9 @@ impl EmojiLabel {
             ui.spacing_mut().item_spacing.x = 0.0;
             match segment {
                 TextSegment::Text(text) => {
-                    let mut label = egui::Label::new(text.clone()).truncate();
-                    if let Some(wrap) = self.wrap {
-                        label = label.wrap();
-                    }
-                    if let Some(selectable) = self.selectable {
-                        label = label.selectable(selectable);
-                    }
-                    if let Some(sense) = self.sense {
-                        label = label.sense(sense);
+                    let mut label = egui::Label::new(text.clone());
+                    if let Some(wrap_mode) = self.wrap_mode {
+                        label = label.wrap_mode(wrap_mode);
                     }
                     resp |= ui.add(label);
                 }
