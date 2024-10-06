@@ -337,10 +337,9 @@ impl EmojiLabel {
         if ui.layout().is_horizontal() && self.auto_inline {
             self.show_segments(ui, &mut state)
         } else {
-            ui.with_layout(
-                Layout::left_to_right(egui::Align::Min).with_main_wrap(true),
-                |ui| self.show_segments(ui, &mut state),
-            )
+            ui.with_layout(Layout::left_to_right(egui::Align::Min), |ui| {
+                self.show_segments(ui, &mut state)
+            })
             .inner
         }
     }
