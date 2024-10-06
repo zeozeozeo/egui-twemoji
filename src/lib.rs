@@ -196,6 +196,7 @@ fn empty_response(ctx: egui::Context) -> egui::Response {
         is_pointer_button_down_on: false,
         interact_pointer_pos: None,
         changed: false,
+        intrinsic_size: None,
     }
 }
 
