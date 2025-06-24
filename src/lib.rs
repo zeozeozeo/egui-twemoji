@@ -287,7 +287,9 @@ impl EmojiLabel {
                     if let Some(wrap_mode) = self.wrap_mode {
                         label = label.wrap_mode(wrap_mode);
                     }
-                    resp |= ui.add(label);
+                    let label = ui.add(label);
+                    resp.layer_id = label.layer_id;
+                    resp |= label;
                 }
                 TextSegment::Emoji(emoji) => {
                     let Some(source) = get_source_for_emoji(emoji) else {
@@ -302,10 +304,12 @@ impl EmojiLabel {
                         .rect;
 
                     // for emoji selection and copying:
-                    resp |= ui.put(
+                    let emoji = ui.put(
                         image_rect,
                         egui::Label::new(RichText::new(emoji).color(egui::Color32::TRANSPARENT)),
                     );
+                    resp.layer_id = emoji.layer_id;
+                    resp |= emoji;
                 }
             }
         }
