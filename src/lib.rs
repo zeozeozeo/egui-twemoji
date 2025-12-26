@@ -152,7 +152,7 @@ pub struct EmojiLabel {
     auto_inline: bool,
 }
 
-fn get_source_for_emoji(emoji: &str) -> Option<ImageSource> {
+fn get_source_for_emoji(emoji: &str) -> Option<ImageSource<'_>> {
     #[cfg(feature = "svg")]
     {
         let svg_data = twemoji_assets::svg::SvgTwemojiAsset::from_emoji(emoji)?;
