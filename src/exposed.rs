@@ -11,6 +11,7 @@ pub struct ExposedRichText {
     pub family: Option<egui::FontFamily>,
     pub text_style: Option<egui::TextStyle>,
     pub background_color: egui::Color32,
+    pub expand_bg: f32,
     pub text_color: Option<egui::Color32>,
     pub code: bool,
     pub strong: bool,
